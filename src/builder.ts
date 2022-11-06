@@ -50,7 +50,9 @@ export function buildColumnQuery(column: TableColumn) {
 }
 
 export function buildAlterQuery(existingModel: Model, actualModel: Model) {
-    if (existingModel.tableName !== actualModel.tableName) throw new Error('table names are different');
+    // shouldn't be possible
+    if (existingModel.tableName !== actualModel.tableName) throw new Error(`[internal] table names are different (${existingModel.tableName} != ${actualModel.tableName})`);
+
     return actualModel.columns
         .filter((col) => existingModel.columns.find((c) => c.name === col.name || c.name === col.mappedTo) == null)
         .map((col) => `ALTER TABLE '${actualModel.tableName}' ADD COLUMN ${buildColumnQuery(col)}`);

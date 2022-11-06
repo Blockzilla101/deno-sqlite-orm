@@ -46,7 +46,7 @@ export class SqliteOrm {
      */
     public column(type?: ColumnType, nullable?: boolean, isPrimaryKey?: boolean, mappedTo?: string) {
         return (model: SqlTable, propertyKey: string) => {
-            if (isPrimaryKey && this.tempModelData.find((i) => i.isPrimaryKey)) throw new Error('model already has a primary key');
+            if (isPrimaryKey && this.tempModelData.find((i) => i.isPrimaryKey)) throw new TypeError(`${model.constructor.name}: table cannot have two primary keys, existing key (${this.tempModelData.find((i) => i.isPrimaryKey)})`);
             this.createTempColumn(
                 {
                     type,
@@ -116,7 +116,7 @@ export class SqliteOrm {
 
             for (const [k, v] of Object.entries(tempModel)) {
                 if (this.ignoredColumns.includes(k)) continue;
-                if (v == null && this.tempModelData.find((i) => i.name === k) == null) throw new Error('Cannot infer type from a null value property');
+                if (v == null && this.tempModelData.find((i) => i.name === k) == null) throw new TypeError(`${tableName ?? model.name}.${k}: Cannot infer type from a null value property`);
 
                 // ignore types other then string, number, boolean or object
                 if (typeof v !== 'string' && typeof v !== 'boolean' && typeof v !== 'object' && typeof v !== 'number') continue;
@@ -164,13 +164,13 @@ export class SqliteOrm {
             return;
         }
 
-        if (typeof model[propertyKey] !== 'string' && typeof model[propertyKey] !== 'boolean' && typeof model[propertyKey] !== 'number' && typeof model[propertyKey] !== 'object' && model[propertyKey] != null) throw new Error('property has an invalid type');
+        if (typeof model[propertyKey] !== 'string' && typeof model[propertyKey] !== 'boolean' && typeof model[propertyKey] !== 'number' && typeof model[propertyKey] !== 'object' && model[propertyKey] != null) throw new Error(`${model.constructor.name}.${propertyKey} has an invalid type, (${typeof model[propertyKey]} is not valid)`);
 
         data.name = propertyKey;
         data.defaultValue = model[propertyKey];
 
         if (data.type == null) {
-            if (model[propertyKey] == null) throw new Error('column type must be specified');
+            if (model[propertyKey] == null) throw new Error(`${model.constructor.name}.${propertyKey}: type must be specified for a column with null value`);
             data.type = typeof model[propertyKey] == 'object' ? 'json' : typeof model[propertyKey] as ColumnType;
         }
 
