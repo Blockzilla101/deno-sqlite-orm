@@ -1,0 +1,29 @@
+{
+  "importMap": "./import-map.json",
+  "lint": {
+    "rules": {
+      "tags": [
+        "recommended"
+      ]
+    },
+    "files": {
+      "include": [
+        "src/",
+        "config.json"
+      ]
+    }
+  },
+  "fmt": {
+    "files": {
+      "include": [
+        "src/"
+      ]
+    },
+    "options": {
+      "useTabs": false,
+      "indentWidth": 4,
+      "singleQuote": true,
+      "lineWidth": 1000
+    }
+  }
+}

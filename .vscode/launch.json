@@ -1,0 +1,20 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "request": "launch",
+            "name": "Run test file",
+            "type": "node",
+            "program": "${workspaceFolder}/src/test.ts",
+            "cwd": "${workspaceFolder}",
+            "runtimeExecutable": "/usr/bin/deno",
+            "runtimeArgs": [
+                "run",
+                "--unstable",
+                "--inspect-brk",
+                "--allow-all"
+            ],
+            "attachSimplePort": 9229
+        }
+    ]
+}

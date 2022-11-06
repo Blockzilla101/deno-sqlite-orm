@@ -1,0 +1,7 @@
+{
+    "imports": {
+        "sqlite-native": "https://deno.land/x/sqlite3@0.6.1/mod.ts",
+        "/": "./src/",
+        "./": "./"
+    }
+}
