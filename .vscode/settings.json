@@ -1,3 +1,40 @@
 {
-    "deno.enable": true
+  "deno.enable": true,
+  "deno.config": "./deno.jsonc",
+  "deno.importMap": "./import-map.json",
+  "deno.lint": true,
+  "editor.formatOnSave": true,
+  "task.saveBeforeRun": "always",
+  "terminal.integrated.fontFamily": "MesloLGM Nerd Font",
+  "todohighlight.isEnable": true,
+  "todohighlight.isCaseSensitive": true,
+  "todohighlight.keywords": [
+    {
+      "text": "// fixme",
+      "color": "#EC7063",
+      "backgroundColor": "#D9888010",
+      "overviewRulerColor": "#EC7063"
+    },
+    {
+      "text": "// todo",
+      "color": "#F5B041",
+      "backgroundColor": "#F4D03F10",
+      "overviewRulerColor": "#F5B041"
+    },
+    {
+      "text": "// test",
+      "color": "#48C9B0",
+      "backgroundColor": "#48C9B010",
+      "overviewRulerColor": "#48C9B0"
+    },
+    {
+      "text": "// incomplete",
+      "color": "#DC7633",
+      "backgroundColor": "#DC763310",
+      "overviewRulerColor": "#DC7633"
+    },
+  ],
+  "todohighlight.defaultStyle": {
+    "isWholeLine": true
+  },
 }

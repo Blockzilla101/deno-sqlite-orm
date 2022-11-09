@@ -1,6 +1,10 @@
-import { SqlTable } from '../mod.ts';
 import { jsonify } from './json.ts';
-import { ColumnType, Model, TableColumn } from '/orm.ts';
+import { ColumnType, DeleteQuery, Model, SelectQuery, TableColumn } from '/orm.ts';
+
+interface BuiltQuery {
+    query: string;
+    params: any[];
+}
 
 function getSqlType(type: ColumnType) {
     switch (type) {
@@ -12,6 +16,8 @@ function getSqlType(type: ColumnType) {
             return 'TEXT';
         case 'blob':
             return 'BLOB';
+        case 'number':
+            return 'REAL';
         default:
             throw new Error('invalid column type');
     }
@@ -21,6 +27,7 @@ function getDefaultValue(type: ColumnType, value: any) {
     switch (type) {
         case 'boolean':
             return value ? 1 : 0;
+        case 'number':
         case 'integer':
             return value;
         case 'json':
@@ -46,12 +53,14 @@ export function buildTableQuery(model: Model) {
 }
 
 export function buildColumnQuery(column: TableColumn) {
-    return `${column.name} ${getSqlType(column.type)} ${column.nullable ? '' : 'NOT NULL'} ${column.defaultValue == null ? '' : 'DEFAULT ' + getDefaultValue(column.type, column.defaultValue)} ${column.isPrimaryKey ? 'PRIMARY KEY' : ''}`;
+    if (column.autoIncrement && column.type != 'integer') throw new Error('Auto increment cannot be used on non integer column.');
+    return `${column.name} ${getSqlType(column.type)} ${column.nullable ? '' : 'NOT NULL'} ${column.defaultValue == null && !column.autoIncrement ? '' : 'DEFAULT ' + getDefaultValue(column.type, column.defaultValue)} ${column.isPrimaryKey ? 'PRIMARY KEY' : ''} ${column.autoIncrement ? 'AUTOINCREMENT' : ''}`;
 }
 
 export function buildAlterQuery(existingModel: Model, actualModel: Model) {
     // shouldn't be possible
     if (existingModel.tableName !== actualModel.tableName) throw new Error(`[internal] table names are different (${existingModel.tableName} != ${actualModel.tableName})`);
+    if (existingModel.columns.find((c) => c.isPrimaryKey)?.name !== actualModel.columns.find((c) => c.isPrimaryKey)?.name) throw new Error(`${existingModel.tableName}: Cannot add a column automatically, a primary key column already exists.`);
 
     return actualModel.columns
         .filter((col) => existingModel.columns.find((c) => c.name === col.name || c.name === col.mappedTo) == null)
@@ -70,10 +79,109 @@ export function buildModelFromData(ogModel: Model, data: any[]): Model {
             name: datum.name,
             nullable: datum.notnull == 0,
             type: ogCol.type,
-            isPrimaryKey: datum.pk == 0,
+            isPrimaryKey: datum.pk == 1,
             mappedTo: ogCol.mappedTo,
+            autoIncrement: ogCol.autoIncrement,
         });
     }
 
     return new Model(ogModel.tableName, cols);
+}
+
+function buildBaseFilterQuery(query: Partial<SelectQuery>): BuiltQuery {
+    const str: string[] = [];
+
+    if (query.where) {
+        str.push(`WHERE ${query.where.query}`);
+    }
+
+    if (query.order) {
+        str.push(`ORDER BY ${query.order.by}${query.order.desc ? ' DESC' : ''}`);
+    }
+
+    if (query.limit) {
+        str.push(`LIMIT ${query.limit}`);
+    }
+
+    if (query.offset) {
+        str.push(`OFFSET ${query.offset}`);
+    }
+
+    return {
+        query: str.join(' '),
+        params: query.where?.values ?? [],
+    };
+}
+
+export function buildSelectQuery(query: SelectQuery, table: string): BuiltQuery {
+    const base = buildBaseFilterQuery(query);
+    base.query = `SELECT * FROM '${table}' ${base.query}`;
+    return base;
+}
+
+export function buildDeleteQuery(query: DeleteQuery, table: string): BuiltQuery {
+    const base = buildBaseFilterQuery(query);
+    base.query = `DELETE FROM '${table}' ${base.query}`;
+    return base;
+}
+
+export function buildInsertQuery(model: Model, data: Record<string, unknown>): BuiltQuery {
+    const params: any[] = [];
+    const cols: string[] = [];
+    for (const [col, value] of Object.entries(data)) {
+        const modelCol = model.columns.find((c) => c.name === col || c.mappedTo === col) as NonNullable<TableColumn>;
+        if (modelCol.isPrimaryKey && modelCol.autoIncrement) continue;
+        cols.push(col);
+        params.push(value);
+    }
+
+    return {
+        query: `INSERT INTO '${model.tableName}' (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`,
+        params,
+    };
+}
+
+export function buildUpdateQuery(model: Model, data: Record<string, unknown>): BuiltQuery {
+    const params: any[] = [];
+    const cols: string[] = [];
+
+    let primaryCol;
+    let primaryVal;
+
+    for (const [col, value] of Object.entries(data)) {
+        const modelCol = model.columns.find((c) => c.name === col || c.mappedTo === col) as NonNullable<TableColumn>;
+
+        if (modelCol.isPrimaryKey) {
+            primaryCol = modelCol.mappedTo ?? modelCol.name;
+            primaryVal = value;
+            continue;
+        }
+
+        cols.push(col);
+        params.push(value);
+    }
+
+    return {
+        query: `UPDATE '${model.tableName}' SET ${cols.map((c) => `${c} = ?`).join(', ')} WHERE ${primaryCol} = ?`,
+        params: [...params, primaryVal],
+    };
+}
+
+export function isProvidedTypeValid(provType: any, col: TableColumn): boolean {
+    if (col.nullable && provType == null) return true;
+    if (typeof provType === 'number' && !Number.isFinite(provType)) return false;
+    switch (col.type) {
+        case 'string':
+            return typeof provType === 'string';
+        case 'boolean':
+            return typeof provType === 'boolean' || provType === 0 || provType === 1;
+        case 'integer':
+            return typeof provType === 'number' && Number.isSafeInteger(provType);
+        case 'number':
+            return typeof provType === 'number';
+        case 'json':
+            return typeof provType === 'object' || provType instanceof Array;
+        case 'blob':
+            return provType instanceof Uint8Array;
+    }
 }
