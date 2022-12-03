@@ -44,6 +44,8 @@ export interface SelectQuery extends WhereClause, Partial<OrderClause> {
     offset?: number;
 }
 
+export type PrimitiveTypes = number | string | boolean;
+
 // delete doesn't require a where clause
 export type DeleteQuery = Partial<SelectQuery>;
 
@@ -77,16 +79,16 @@ export class SqliteOrm {
 
     //#region table logic
 
-    public findOne<T extends SqlTable>(table: new () => T, id: any): T {
+    public findOne<T extends SqlTable>(table: new () => T, idOrQuery: PrimitiveTypes | SelectQuery): T {
         const col = this.models[table.name].columns.find((c) => c.isPrimaryKey);
         if (col == null) throw new Error(`${this.models[table.name].tableName} does not have primary key`);
-        if (!isProvidedTypeValid(id, col)) throw new TypeError(`${this.models[table.name].tableName}.${col.name} has a different type`);
+        if (typeof idOrQuery !== 'object' && !isProvidedTypeValid(idOrQuery, col)) throw new TypeError(`${this.models[table.name].tableName}.${col.name} has a different type`);
 
         const query = buildSelectQuery(
-            {
+            typeof idOrQuery === 'object' ? { ...idOrQuery, limit: 1 } : {
                 where: {
                     query: `${col.mappedTo ?? col.name} = ?`,
-                    values: [this.serialize(id, col.type)],
+                    values: [this.serialize(idOrQuery, col.type)],
                 },
                 limit: 1,
             },
@@ -94,7 +96,13 @@ export class SqliteOrm {
         );
 
         const found = this.db.prepare(query.query).get(...query.params);
-        if (!found) throw new Error(`row with ${col.name} = ${id} was not found in table ${table.name}`);
+        if (!found) {
+            if (typeof idOrQuery === 'object') {
+                throw new Error(`query did not match any items in ${table.name}`);
+            } else {
+                throw new Error(`row with ${col.name} = ${idOrQuery} was not found in table ${table.name}`);
+            }
+        }
 
         const parsed = new table();
         for (const col of this.models[table.name].columns) {
@@ -291,6 +299,8 @@ export class SqliteOrm {
                 if (newCols.length > 0) {
                     SqliteOrm.logInfo(this.opts, `[${model.name}] found ${newCols.length} new column(s) (${newCols.map((c) => c.name).join(', ')})`);
                 }
+
+                // todo: log column data type differences
 
                 this.saveModel();
             }
