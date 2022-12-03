@@ -59,8 +59,20 @@ export class SqliteOrm {
     private tempModelData: TableColumn[] = [];
     private ignoredColumns: string[] = [];
 
+    private opts: OrmOptions;
+    private lastModel: Record<string, Model> = {};
+
     constructor(options: OrmOptions) {
+        this.opts = options;
+
+        SqliteOrm.logInfo(this.opts, 'opening database');
+
         this.db = new SqliteDatabase(options.dbPath, options.openOptions);
+        try {
+            this.lastModel = JSON.parse(Deno.readTextFileSync(`${options.dbPath}.model.json`));
+        } catch (_e) {
+            this.lastModel = {};
+        }
     }
 
     //#region table logic
@@ -85,9 +97,8 @@ export class SqliteOrm {
         if (!found) throw new Error(`row with ${col.name} = ${id} was not found in table ${table.name}`);
 
         const parsed = new table();
-        for (const [key, value] of Object.entries(found)) {
-            const columnData = this.models[table.name].columns.find((c) => c.mappedTo === key || c.name === key) as NonNullable<TableColumn>;
-            (parsed as Record<string, unknown>)[columnData.name] = this.deseralize(value, columnData.type);
+        for (const col of this.models[table.name].columns) {
+            (parsed as Record<string, unknown>)[col.name] = this.deseralize(found[col.mappedTo ?? col.name], col.type);
         }
 
         return parsed;
@@ -101,9 +112,8 @@ export class SqliteOrm {
 
         for (const datum of data) {
             const parsed = new table();
-            for (const [key, value] of Object.entries(datum)) {
-                const columnData = this.models[table.name].columns.find((c) => c.mappedTo === key || c.name === key) as NonNullable<TableColumn>;
-                (parsed as Record<string, unknown>)[columnData.name] = this.deseralize(value, columnData.type);
+            for (const col of this.models[table.name].columns) {
+                (parsed as Record<string, unknown>)[col.name] = this.deseralize(datum[col.mappedTo ?? col.name], col.type);
             }
             parsedAll.push(parsed);
         }
@@ -263,8 +273,39 @@ export class SqliteOrm {
                     this.db.exec(c);
                 });
             }
+
+            if (this.lastModel[model.name] == null) {
+                SqliteOrm.logInfo(this.opts, `found new table ${model.name}`);
+                this.saveModel();
+            } else {
+                const removed = this.lastModel[model.name].columns
+                    .filter((c) => builtModel.columns.find((b) => (b.mappedTo ?? b.name) === (c.mappedTo ?? c.name)) == null);
+
+                const newCols = builtModel.columns
+                    .filter((c) => this.lastModel[model.name].columns.find((b) => (b.mappedTo ?? b.name) === (c.mappedTo ?? c.name)) == null);
+
+                if (removed.length > 0) {
+                    SqliteOrm.logInfo(this.opts, `[${model.name}] found ${removed.length} removed column(s) (${removed.map((c) => c.name).join(', ')})`);
+                }
+
+                if (newCols.length > 0) {
+                    SqliteOrm.logInfo(this.opts, `[${model.name}] found ${newCols.length} new column(s) (${newCols.map((c) => c.name).join(', ')})`);
+                }
+
+                this.saveModel();
+            }
         };
     }
+
+    //#region logging
+
+    public static logInfo: (dbOptions: OrmOptions, ...msg: any[]) => void = () => {
+    };
+
+    public static logDebug: (dbOptions: OrmOptions, ...msg: any[]) => void = () => {
+    };
+
+    //#endregion logging
 
     //#endregion decorators
 
@@ -311,5 +352,9 @@ export class SqliteOrm {
     private deseralize(data: any, type: ColumnType) {
         // fixme: implement
         return data;
+    }
+
+    private saveModel() {
+        Deno.writeTextFileSync(`${this.opts.dbPath}.model.json`, JSON.stringify(this.models, null, 2));
     }
 }
