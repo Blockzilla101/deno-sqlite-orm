@@ -1,5 +1,4 @@
 {
-  "importMap": "./import-map.json",
   "lint": {
     "rules": {
       "tags": [

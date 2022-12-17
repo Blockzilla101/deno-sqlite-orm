@@ -1,5 +1,6 @@
 import { Database as SqliteDatabase, DatabaseOpenOptions } from 'https://deno.land/x/sqlite3@0.6.1/mod.ts';
 import { buildAlterQuery, buildDeleteQuery, buildInsertQuery, buildModelFromData, buildSelectQuery, buildTableQuery, buildUpdateQuery, isProvidedTypeValid } from './builder.ts';
+import { DBInvalidTable, DBNotFound } from './errors.ts';
 
 interface OrmOptions {
     dbPath: string;
@@ -81,7 +82,7 @@ export class SqliteOrm {
 
     public findOne<T extends SqlTable>(table: new () => T, idOrQuery: PrimitiveTypes | SelectQuery): T {
         const col = this.models[table.name].columns.find((c) => c.isPrimaryKey);
-        if (col == null) throw new Error(`${this.models[table.name].tableName} does not have primary key`);
+        if (col == null) throw new DBInvalidTable(`${this.models[table.name].tableName} does not have primary key`);
         if (typeof idOrQuery !== 'object' && !isProvidedTypeValid(idOrQuery, col)) throw new TypeError(`${this.models[table.name].tableName}.${col.name} has a different type`);
 
         const query = buildSelectQuery(
@@ -98,9 +99,9 @@ export class SqliteOrm {
         const found = this.db.prepare(query.query).get(...query.params);
         if (!found) {
             if (typeof idOrQuery === 'object') {
-                throw new Error(`query did not match any items in ${table.name}`);
+                throw new DBNotFound(`query did not match any items in ${table.name}`);
             } else {
-                throw new Error(`row with ${col.name} = ${idOrQuery} was not found in table ${table.name}`);
+                throw new DBNotFound(`row with ${col.name} = ${idOrQuery} was not found in table ${table.name}`);
             }
         }
 
@@ -171,7 +172,7 @@ export class SqliteOrm {
      */
     public column(data: Partial<TableColumn>) {
         return (model: { constructor: new () => SqlTable } | SqlTable, propertyKey: string) => {
-            if (data.isPrimaryKey && this.tempModelData.find((i) => i.isPrimaryKey)) throw new TypeError(`${model.constructor.name}: table cannot have two primary keys, existing key (${this.tempModelData.find((i) => i.isPrimaryKey)})`);
+            if (data.isPrimaryKey && this.tempModelData.find((i) => i.isPrimaryKey)) throw new DBInvalidTable(`${model.constructor.name}: table cannot have two primary keys, existing key (${this.tempModelData.find((i) => i.isPrimaryKey)})`);
             this.createTempColumn(data, new (model as { constructor: new () => SqlTable }).constructor(), propertyKey);
         };
     }
@@ -244,7 +245,7 @@ export class SqliteOrm {
 
             for (const [k, v] of Object.entries(tempModel)) {
                 if (this.ignoredColumns.includes(k)) continue;
-                if (v == null && this.tempModelData.find((i) => i.name === k) == null) throw new TypeError(`${tableName ?? model.name}.${k}: Cannot infer type from a null value property`);
+                if (v == null && this.tempModelData.find((i) => i.name === k) == null) throw new DBInvalidTable(`${tableName ?? model.name}.${k}: Cannot infer type from a null value property`);
 
                 // ignore types other then string, number, boolean or object
                 if (typeof v !== 'string' && typeof v !== 'boolean' && typeof v !== 'object' && typeof v !== 'number') continue;
@@ -326,13 +327,13 @@ export class SqliteOrm {
             return;
         }
 
-        if (typeof model[propertyKey] !== 'string' && typeof model[propertyKey] !== 'boolean' && typeof model[propertyKey] !== 'number' && typeof model[propertyKey] !== 'object' && model[propertyKey] != null) throw new Error(`${model.constructor.name}.${propertyKey} has an invalid type, (${typeof model[propertyKey]} is not valid)`);
+        if (typeof model[propertyKey] !== 'string' && typeof model[propertyKey] !== 'boolean' && typeof model[propertyKey] !== 'number' && typeof model[propertyKey] !== 'object' && model[propertyKey] != null) throw new DBInvalidTable(`${model.constructor.name}.${propertyKey} has an invalid type, (${typeof model[propertyKey]} is not valid)`);
 
         data.name = propertyKey;
         data.defaultValue = model[propertyKey];
 
         if (data.type == null) {
-            if (model[propertyKey] == null) throw new Error(`${model.constructor.name}.${propertyKey}: type must be specified for a column with null value`);
+            if (model[propertyKey] == null) throw new DBInvalidTable(`${model.constructor.name}.${propertyKey}: type must be specified for a column with null value`);
             data.type = typeof model[propertyKey] == 'object' ? 'json' : typeof model[propertyKey] as ColumnType;
         }
 

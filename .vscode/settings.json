@@ -1,9 +1,7 @@
 {
   "deno.enable": true,
   "deno.config": "./deno.jsonc",
-  "deno.importMap": "./import-map.json",
   "deno.lint": true,
-  "editor.formatOnSave": true,
   "task.saveBeforeRun": "always",
   "terminal.integrated.fontFamily": "MesloLGM Nerd Font",
   "todohighlight.isEnable": true,
