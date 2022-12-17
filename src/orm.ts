@@ -1,4 +1,4 @@
-import { Database as SqliteDatabase, DatabaseOpenOptions } from 'sqlite-native';
+import { Database as SqliteDatabase, DatabaseOpenOptions } from 'https://deno.land/x/sqlite3@0.6.1/mod.ts';
 import { buildAlterQuery, buildDeleteQuery, buildInsertQuery, buildModelFromData, buildSelectQuery, buildTableQuery, buildUpdateQuery, isProvidedTypeValid } from './builder.ts';
 
 interface OrmOptions {

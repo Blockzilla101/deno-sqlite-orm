@@ -1,1 +1,1 @@
-export { SqliteOrm, SqlTable } from '/orm.ts'
+export { SqliteOrm, SqlTable } from './src/orm.ts'

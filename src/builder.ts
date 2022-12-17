@@ -1,5 +1,5 @@
 import { jsonify } from './json.ts';
-import { ColumnType, DeleteQuery, Model, SelectQuery, TableColumn } from '/orm.ts';
+import { ColumnType, DeleteQuery, Model, SelectQuery, TableColumn } from './orm.ts';
 
 interface BuiltQuery {
     query: string;
