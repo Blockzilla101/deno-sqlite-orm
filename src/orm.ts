@@ -113,6 +113,17 @@ export class SqliteOrm {
         return parsed;
     }
 
+    public findOneOptional<T extends SqlTable>(table: new () => T, idOrQuery: PrimitiveTypes | SelectQuery): T {
+        try {
+            return this.findOne(table, idOrQuery);
+        } catch (e) {
+            if (e instanceof DBNotFound) {
+                return new table();
+            }
+            throw e;
+        }
+    }
+
     public findMany<T extends SqlTable>(table: new () => T, query: SelectQuery): T[] {
         const builtQuery = buildSelectQuery(query, this.models[table.name].tableName);
 
