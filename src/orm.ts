@@ -28,7 +28,7 @@ export interface TableColumn {
 
 export interface WhereClause {
     where: {
-        query: string;
+        clause: string;
         values?: any[];
     };
 }
@@ -40,7 +40,7 @@ export interface OrderClause {
     };
 }
 
-export interface SelectQuery extends WhereClause, Partial<OrderClause> {
+export interface SelectQuery extends Partial<WhereClause>, Partial<OrderClause> {
     limit?: number;
     offset?: number;
 }
@@ -88,7 +88,7 @@ export class SqliteOrm {
         const query = buildSelectQuery(
             typeof idOrQuery === 'object' ? { ...idOrQuery, limit: 1 } : {
                 where: {
-                    query: `${col.mappedTo ?? col.name} = ?`,
+                    clause: `${col.mappedTo ?? col.name} = ?`,
                     values: [this.serialize(idOrQuery, col.type)],
                 },
                 limit: 1,

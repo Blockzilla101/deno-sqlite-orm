@@ -92,7 +92,7 @@ function buildBaseFilterQuery(query: Partial<SelectQuery>): BuiltQuery {
     const str: string[] = [];
 
     if (query.where) {
-        str.push(`WHERE ${query.where.query}`);
+        str.push(`WHERE ${query.where.clause}`);
     }
 
     if (query.order) {
