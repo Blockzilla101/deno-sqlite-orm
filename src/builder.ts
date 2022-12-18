@@ -176,7 +176,7 @@ export function buildCountWhereQuery(query: WhereClause, table: string): BuiltQu
 
 export function buildAggregateQuery(query: AggregateSelectQuery, table: string): BuiltQuery {
     const params: any[] = [];
-    const str = [`SELECT ${query.select.expr} FROM '${table}'`];
+    const str = [`SELECT ${query.select.clause} FROM '${table}'`];
 
     if (query.where) {
         str.push(`WHERE ${query.where.clause}`);

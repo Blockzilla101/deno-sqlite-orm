@@ -43,7 +43,7 @@ export interface OrderClause {
 
 export interface AggregateClause {
     select: {
-        expr: string;
+        clause: string;
     };
 }
 
