@@ -54,7 +54,7 @@ export function buildTableQuery(model: Model) {
 
 export function buildColumnQuery(column: TableColumn) {
     if (column.autoIncrement && column.type != 'integer') throw new Error('Auto increment cannot be used on non integer column.');
-    return `${column.name} ${getSqlType(column.type)} ${column.nullable ? '' : 'NOT NULL'} ${column.defaultValue == null && !column.autoIncrement ? '' : 'DEFAULT ' + getDefaultValue(column.type, column.defaultValue)} ${column.isPrimaryKey ? 'PRIMARY KEY' : ''} ${column.autoIncrement ? 'AUTOINCREMENT' : ''}`;
+    return `"${column.name}" ${getSqlType(column.type)} ${column.nullable ? '' : 'NOT NULL'} ${column.defaultValue == null && !column.autoIncrement ? '' : 'DEFAULT ' + getDefaultValue(column.type, column.defaultValue)} ${column.isPrimaryKey ? 'PRIMARY KEY' : ''} ${column.autoIncrement ? 'AUTOINCREMENT' : ''}`;
 }
 
 export function buildAlterQuery(existingModel: Model, actualModel: Model) {

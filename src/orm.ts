@@ -1,6 +1,7 @@
 import { Database as SqliteDatabase, DatabaseOpenOptions } from 'https://deno.land/x/sqlite3@0.6.1/mod.ts';
 import { buildAlterQuery, buildDeleteQuery, buildInsertQuery, buildModelFromData, buildSelectQuery, buildTableQuery, buildUpdateQuery, isProvidedTypeValid } from './builder.ts';
-import { DBInvalidTable, DBNotFound } from './errors.ts';
+import { DBInvalidData, DBInvalidTable, DBNotFound } from './errors.ts';
+import { dejsonify, jsonify } from './json.ts';
 
 interface OrmOptions {
     dbPath: string;
@@ -83,7 +84,7 @@ export class SqliteOrm {
     public findOne<T extends SqlTable>(table: new () => T, idOrQuery: PrimitiveTypes | SelectQuery): T {
         const col = this.models[table.name].columns.find((c) => c.isPrimaryKey);
         if (col == null) throw new DBInvalidTable(`${this.models[table.name].tableName} does not have primary key`);
-        if (typeof idOrQuery !== 'object' && !isProvidedTypeValid(idOrQuery, col)) throw new TypeError(`${this.models[table.name].tableName}.${col.name} has a different type`);
+        if (typeof idOrQuery !== 'object' && !isProvidedTypeValid(idOrQuery, col)) throw new DBInvalidData(`${this.models[table.name].tableName}.${col.name} has a different type`);
 
         const query = buildSelectQuery(
             typeof idOrQuery === 'object' ? { ...idOrQuery, limit: 1 } : {
@@ -366,14 +367,71 @@ export class SqliteOrm {
     }
 
     private serialize(data: any, type: ColumnType) {
-        // fixme: implement
         if (data == null) return null;
-        return data;
+        switch (type) {
+            case 'boolean': {
+                if (typeof data !== 'boolean') throw new DBInvalidData('Cannot store a non boolean type on a boolean column');
+                return data ? 1 : 0;
+            }
+            case 'string': {
+                if (typeof data !== 'string') throw new DBInvalidData('Cannot store a non string type on a string column');
+                return data;
+            }
+            case 'number': {
+                if (typeof data !== 'number') throw new DBInvalidData('Cannot store a non number type on a number column');
+                return data;
+            }
+            case 'integer': {
+                if (typeof data !== 'number' || Number.isInteger(data)) throw new DBInvalidData('Cannot store a non integer type on an integer column');
+                return data;
+            }
+            case 'blob': {
+                if (!(data instanceof Uint8Array)) throw new DBInvalidData('Cannot store a blob/u8int[] type on a blob column');
+                return data;
+            }
+            case 'json': {
+                if (typeof data !== 'object') throw new DBInvalidData('Cannot convert non object type into JSON');
+                return JSON.stringify(jsonify(data));
+            }
+            default: {
+                throw new Error(`Unknown column type: ${type}`);
+            }
+        }
     }
 
     private deseralize(data: any, type: ColumnType) {
-        // fixme: implement
-        return data;
+        if (data == null) return null;
+        switch (type) {
+            case 'boolean': {
+                if (typeof data !== 'number' && !Number.isInteger(data)) throw new DBInvalidData(`Column contains ${data} instead of a boolean`);
+                return data === 1 ? true : false;
+            }
+            case 'string': {
+                if (typeof data !== 'string') throw new DBInvalidData(`Column contains ${data} instead of a string`);
+                return data;
+            }
+            case 'number': {
+                if (typeof data !== 'number') throw new DBInvalidData(`Column contains ${data} instead of a number`);
+                return data;
+            }
+            case 'integer': {
+                if (typeof data !== 'number' && !Number.isInteger(data)) throw new DBInvalidData(`Column contains ${data} instead of an integer`);
+                return data;
+            }
+            case 'blob': {
+                if (!(data instanceof Uint8Array)) throw new DBInvalidData(`Column contains ${typeof data} instead of a blob`);
+                return data;
+            }
+            case 'json': {
+                if (typeof data !== 'string') throw new DBInvalidData(`Column contains ${typeof data} instead of a JSON string`);
+                try {
+                    const parsed = JSON.parse(data);
+                    return dejsonify(parsed);
+                } catch (e) {
+                    throw new DBInvalidData('Column contains invalid JSON data', { cause: e });
+                }
+            }
+        }
     }
 
     private saveModel() {
