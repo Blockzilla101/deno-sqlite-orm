@@ -3,7 +3,7 @@ const serializableClasses: {
     ignoredProps: string[];
 }[] = [];
 
-export function registerJsonSerializabe(ignoredProps: string[]) {
+export function registerJsonSerializabe(ignoredProps: string[] = []) {
     return (clas: new () => any) => {
         serializableClasses.push({
             classRef: clas,
@@ -17,6 +17,7 @@ function isSerializabe(obj: any): boolean {
 }
 
 function writeValue(val: any) {
+    if (val == null) return null;
     switch (typeof val) {
         case 'boolean':
             return val;
@@ -62,6 +63,7 @@ function writeValue(val: any) {
 }
 
 function readValue(val: any) {
+    if (val == null) return null;
     switch (typeof val) {
         case 'boolean':
             return val;
@@ -75,7 +77,7 @@ function readValue(val: any) {
             }
 
             if (val.type === 'Map') {
-                return new Map(dejsonify([val.data]));
+                return new Map(dejsonify(val.data));
             }
 
             if (val.type === 'U8IntArray') {
@@ -102,6 +104,7 @@ function readValue(val: any) {
     }
 }
 
+// not really indented for directly serializing maps, custom classes etc
 /**
  * @param obj Object to convert to JSON
  * @returns JSON safe object
