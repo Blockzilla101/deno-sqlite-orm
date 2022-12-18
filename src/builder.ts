@@ -1,5 +1,5 @@
 import { jsonify } from './json.ts';
-import { ColumnType, DeleteQuery, Model, SelectQuery, TableColumn } from './orm.ts';
+import { AggregateSelectQuery, ColumnType, DeleteQuery, Model, SelectQuery, TableColumn, WhereClause } from './orm.ts';
 
 interface BuiltQuery {
     query: string;
@@ -164,6 +164,49 @@ export function buildUpdateQuery(model: Model, data: Record<string, unknown>): B
     return {
         query: `UPDATE '${model.tableName}' SET ${cols.map((c) => `${c} = ?`).join(', ')} WHERE ${primaryCol} = ?`,
         params: [...params, primaryVal],
+    };
+}
+
+export function buildCountWhereQuery(query: WhereClause, table: string): BuiltQuery {
+    return {
+        query: `SELECT COUNT(*) FROM '${table}' WHERE ${query.where.clause}`,
+        params: query.where.values ?? [],
+    };
+}
+
+export function buildAggregateQuery(query: AggregateSelectQuery, table: string): BuiltQuery {
+    const params: any[] = [];
+    const str = [`SELECT ${query.select.expr} FROM '${table}'`];
+
+    if (query.where) {
+        str.push(`WHERE ${query.where.clause}`);
+        params.push(...(query.where.values ?? []));
+    }
+
+    if (query.group) {
+        str.push(`GROUP BY ${query.group.cols.join(', ')}`);
+    }
+
+    if (query.having) {
+        str.push(`HAVING ${query.having.clause}`);
+        params.push(...(query.having.values ?? []));
+    }
+
+    if (query.order) {
+        str.push(`ORDER BY ${query.order.by}${query.order.desc ? ' DESC' : ''}`);
+    }
+
+    if (query.limit) {
+        str.push(`LIMIT ${query.limit}`);
+    }
+
+    if (query.offset) {
+        str.push(`OFFSET ${query.offset}`);
+    }
+
+    return {
+        query: str.join(' '),
+        params: params,
     };
 }
 

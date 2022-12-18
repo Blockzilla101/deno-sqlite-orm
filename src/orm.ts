@@ -1,5 +1,5 @@
 import { Database as SqliteDatabase, DatabaseOpenOptions } from 'https://deno.land/x/sqlite3@0.6.1/mod.ts';
-import { buildAlterQuery, buildDeleteQuery, buildInsertQuery, buildModelFromData, buildSelectQuery, buildTableQuery, buildUpdateQuery, isProvidedTypeValid } from './builder.ts';
+import { buildAggregateQuery, buildAlterQuery, buildCountWhereQuery, buildDeleteQuery, buildInsertQuery, buildModelFromData, buildSelectQuery, buildTableQuery, buildUpdateQuery, isProvidedTypeValid } from './builder.ts';
 import { DBInvalidData, DBInvalidTable, DBNotFound } from './errors.ts';
 import { dejsonify, jsonify } from './json.ts';
 
@@ -41,9 +41,31 @@ export interface OrderClause {
     };
 }
 
+export interface AggregateClause {
+    select: {
+        expr: string;
+    };
+}
+
+export interface GroupByClause {
+    group: {
+        cols: string[];
+    };
+}
+
+export interface HavingClause {
+    having: {
+        clause: string;
+        values?: any[];
+    };
+}
+
 export interface SelectQuery extends Partial<WhereClause>, Partial<OrderClause> {
     limit?: number;
     offset?: number;
+}
+
+export interface AggregateSelectQuery extends SelectQuery, AggregateClause, GroupByClause, Partial<HavingClause> {
 }
 
 export type PrimitiveTypes = number | string | boolean;
@@ -140,6 +162,16 @@ export class SqliteOrm {
         }
 
         return parsedAll;
+    }
+
+    public countWhere<T extends SqlTable>(table: new () => T, query: WhereClause): number {
+        const builtQuery = buildCountWhereQuery(query, this.models[table.name].tableName);
+        return this.db.prepare(builtQuery.query).get<{ 'COUNT(*)': number }>(...builtQuery.params)!['COUNT(*)'];
+    }
+
+    public aggregateSelect<Row extends Array<any>, T extends SqlTable = SqlTable>(table: new () => T, query: AggregateSelectQuery): Row[] {
+        const builtQuery = buildAggregateQuery(query, this.models[table.name].tableName);
+        return this.db.prepare(builtQuery.query).values(...builtQuery.params);
     }
 
     public save<T extends SqlTable>(table: T): T {
