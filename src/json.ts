@@ -54,7 +54,7 @@ function writeValue(val: any) {
 
             return {
                 data: jsonify(val),
-                type: 'unknown',
+                type: 'object',
             };
         }
         default:
@@ -62,7 +62,7 @@ function writeValue(val: any) {
     }
 }
 
-function readValue(val: any) {
+function readValue(val: any, compatMode: boolean) {
     if (val == null) return null;
     switch (typeof val) {
         case 'boolean':
@@ -73,31 +73,39 @@ function readValue(val: any) {
             return val;
         case 'object': {
             if (val instanceof Array) {
-                return dejsonify(val);
+                return dejsonify(val, compatMode);
             }
 
+            if (val.type == null) {
+                if (compatMode) return dejsonify(val, compatMode)
+                throw new Error('JSON object has a null type');
+            }
+
+
             if (val.type === 'Map') {
-                return new Map(dejsonify(val.data));
+                return new Map(dejsonify(val.data, compatMode));
             }
 
             if (val.type === 'U8IntArray') {
-                return []; // fixme parse base64
+                return new Uint8Array(); // fixme parse base64
+            }
+
+            if (val.type === 'object') {
+                return dejsonify(val.data, compatMode);
             }
 
             if (val.type.startsWith('custom-')) {
                 const clas = serializableClasses.find((c) => c.classRef.name === val.type.slice('custom-'.length));
                 if (clas != null) {
                     const obj = new clas.classRef();
-                    Object.assign(obj, dejsonify(val.data));
+                    Object.assign(obj, dejsonify(val.data, compatMode));
                     return obj;
                 }
+                throw new Error(`Class for type '${val.type.slice('custom-'.length)}' was not registered`);
             }
 
-            if (val.type === 'unknown') {
-                return dejsonify(val.data);
-            }
-
-            throw new Error(`Unknown object type: ${val.type}`);
+            if (compatMode) return dejsonify(val, compatMode);
+            throw new Error(`JSON object is of unknown type ${val.type}`);
         }
         default:
             throw new Error(`Cannot read object of type ${typeof val}`);
@@ -135,11 +143,11 @@ export function jsonify(obj: Record<string, any> | any[], ignoredProps: string[]
  * @param json JSON safe object
  * @returns object before serializing
  */
-export function dejsonify(jsonObj: Record<string, any> | any[]): any {
+export function dejsonify(jsonObj: Record<string, any> | any[], compatMode: boolean): any {
     if (jsonObj instanceof Array) {
         const parsed: any[] = [];
         for (const item of jsonObj) {
-            parsed.push(readValue(item));
+            parsed.push(readValue(item, compatMode));
         }
         return parsed;
     }
@@ -147,7 +155,7 @@ export function dejsonify(jsonObj: Record<string, any> | any[]): any {
     // parse objects
     const parsed: Record<string, any> = {};
     for (const [key, value] of Object.entries(jsonObj)) {
-        parsed[key] = readValue(value);
+        parsed[key] = readValue(value, compatMode);
     }
 
     return parsed;

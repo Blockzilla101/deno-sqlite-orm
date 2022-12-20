@@ -3,6 +3,8 @@
   "deno.config": "./deno.jsonc",
   "deno.lint": true,
   "task.saveBeforeRun": "always",
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "denoland.vscode-deno",
   "terminal.integrated.fontFamily": "MesloLGM Nerd Font",
   "todohighlight.isEnable": true,
   "todohighlight.isCaseSensitive": true,
@@ -34,5 +36,8 @@
   ],
   "todohighlight.defaultStyle": {
     "isWholeLine": true
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "denoland.vscode-deno"
   },
 }

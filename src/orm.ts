@@ -8,6 +8,7 @@ interface OrmOptions {
     openOptions?: DatabaseOpenOptions;
     backupDir?: string;
     backupInterval?: number;
+    jsonCompatMode?: boolean;
 }
 
 export type ColumnType = 'string' | 'number' | 'boolean' | 'json' | 'integer' | 'blob';
@@ -132,6 +133,7 @@ export class SqliteOrm {
         for (const col of this.models[table.name].columns) {
             (parsed as Record<string, unknown>)[col.name] = this.deseralize(found[col.mappedTo ?? col.name], col.type);
         }
+        parsed._new = false;
 
         return parsed;
     }
@@ -297,12 +299,25 @@ export class SqliteOrm {
                 if (hasPrimaryKey && k === 'id') continue;
                 if (k.startsWith('_')) continue;
 
+                let type: ColumnType;
+                if (this.tempModelData.find((i) => i.name === k) == null) {
+                    if (typeof v === 'object') {
+                        type = 'json';
+                    } else if (typeof v === 'number') {
+                        type = 'integer';
+                    } else {
+                        type = typeof v as ColumnType;
+                    }
+                } else {
+                    type = this.tempModelData.find((i) => i.name === k)!.type;
+                }
+
                 this.createTempColumn(
                     {
                         defaultValue: v,
                         nullable: v == null,
                         name: k,
-                        type: (typeof v === 'object' ? 'json' : (k === 'id' ? 'integer' : typeof v)) as ColumnType,
+                        type: type,
                         isPrimaryKey: !hasPrimaryKey && k === 'id',
                         autoIncrement: k === 'id' && !hasPrimaryKey,
                     },
@@ -458,7 +473,7 @@ export class SqliteOrm {
                 if (typeof data !== 'string') throw new DBInvalidData(`Column contains ${typeof data} instead of a JSON string`);
                 try {
                     const parsed = JSON.parse(data);
-                    return dejsonify(parsed);
+                    return dejsonify(parsed, this.opts.jsonCompatMode ?? false);
                 } catch (e) {
                     throw new DBInvalidData('Column contains invalid JSON data', { cause: e });
                 }
