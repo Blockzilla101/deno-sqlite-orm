@@ -3,12 +3,19 @@ Sqlite ORM for deno. Tables with relations are not supporeted.
 #### Usage
 **Create an instance of the ORM:**
 ```typescript
-import { SqliteOrm, SqlTable } from 'https://raw.githubusercontent.com/Blockzilla101/deno-sqlite-orm/0.1.0/mod.ts';
+import { SqliteOrm, SqlTable } from 'https://raw.githubusercontent.com/Blockzilla101/deno-sqlite-orm/0.2.0/mod.ts';
 const orm = new SqliteOrm({
-    dbPath: 'path/to/database.db',
+    dbPath: 'path/to/database.db'
 });
 ```
-You can access the database instance directly by `orm.db`.<br>
+You can access the database instance directly by `orm.db`. If you are using an existing database and it contains JSON objects, enable `jsonCompatMode` in options or objects similar to:
+```json
+{
+    "foo": "baz",
+    "bar": 0
+}
+```
+will not be parsed.<br>
 
 **Create a model:**
 ```typescript
@@ -121,7 +128,7 @@ orm.aggregateSelect<[foo: string, count: number]>(Foo, {
 Objects are converted to JSON before saving, and parsed when read. If its a class instance then the class should be registered
 by `@registerJsonSerializabe()`
 ```typescript
-import { registerJsonSerializabe } from 'https://raw.githubusercontent.com/Blockzilla101/deno-sqlite-orm/0.1.0/mod.ts';
+import { registerJsonSerializabe } from 'https://raw.githubusercontent.com/Blockzilla101/deno-sqlite-orm/0.2.0/mod.ts';
 
 @registerJsonSerializabe(['ignored'])
 class Bar {
@@ -139,7 +146,7 @@ class Foo extends SqlTable {
 
 ##### Example
 ```typescript
-import { SqliteOrm, SqlTable } from 'https://raw.githubusercontent.com/Blockzilla101/deno-sqlite-orm/0.1.0/mod.ts';
+import { SqliteOrm, SqlTable } from 'https://raw.githubusercontent.com/Blockzilla101/deno-sqlite-orm/0.2.0/mod.ts';
 const orm = new SqliteOrm({
     dbPath: 'path/to/database.db',
 });
