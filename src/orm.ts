@@ -2,6 +2,7 @@ import { Database as SqliteDatabase, DatabaseOpenOptions } from 'https://deno.la
 import { buildAggregateQuery, buildAlterQuery, buildCountWhereQuery, buildDeleteQuery, buildInsertQuery, buildModelFromData, buildSelectQuery, buildTableQuery, buildUpdateQuery, isProvidedTypeValid } from './builder.ts';
 import { DBInvalidData, DBInvalidTable, DBNotFound } from './errors.ts';
 import { dejsonify, jsonify } from './json.ts';
+import { prettyPrintDiff } from './util.ts';
 
 interface OrmOptions {
     dbPath: string;
@@ -80,7 +81,8 @@ export class Model {
 
 export class SqliteOrm {
     public db: SqliteDatabase;
-    private hasChanges = false;
+    private hasChangesSinceBackup = false;
+    private backupsEnabled = false;
 
     public models: Record<string, Model> = {};
     private tempModelData: TableColumn[] = [];
@@ -91,6 +93,9 @@ export class SqliteOrm {
 
     constructor(options: OrmOptions) {
         this.opts = options;
+        if (this.opts.backupDir) {
+            Deno.statSync(this.opts.backupDir);
+        }
 
         SqliteOrm.logInfo(this.opts, 'opening database');
 
@@ -198,6 +203,7 @@ export class SqliteOrm {
             const builtQuery = buildUpdateQuery(model, builtData);
             this.db.exec(builtQuery.query, ...builtQuery.params);
         }
+        this.hasChangesSinceBackup = true;
 
         return table;
     }
@@ -205,6 +211,7 @@ export class SqliteOrm {
     public delete<T extends SqlTable>(table: new () => T, query: DeleteQuery) {
         const built = buildDeleteQuery(query, this.models[table.name].tableName);
         this.db.exec(built.query, ...built.params);
+        this.hasChangesSinceBackup = true;
     }
 
     //#endregion table logic
@@ -346,21 +353,28 @@ export class SqliteOrm {
                 SqliteOrm.logInfo(this.opts, `found new table ${model.name}`);
                 this.saveModel();
             } else {
-                const removed = this.lastModel[model.name].columns
-                    .filter((c) => builtModel.columns.find((b) => (b.mappedTo ?? b.name) === (c.mappedTo ?? c.name)) == null);
+                const oldCols = this.lastModel[model.name].columns;
+                const newCols = builtModel.columns;
 
-                const newCols = builtModel.columns
-                    .filter((c) => this.lastModel[model.name].columns.find((b) => (b.mappedTo ?? b.name) === (c.mappedTo ?? c.name)) == null);
+                for (const oldCol of oldCols) {
+                    const newCol = newCols.find((c) => (c.mappedTo ?? c.name) === (oldCol.mappedTo ?? oldCol.name));
+                    // missing col
+                    if (newCol == null) {
+                        SqliteOrm.logInfo(this.opts, `${oldCol.name} was removed`);
+                        continue;
+                    }
 
-                if (removed.length > 0) {
-                    SqliteOrm.logInfo(this.opts, `[${model.name}] found ${removed.length} removed column(s) (${removed.map((c) => c.name).join(', ')})`);
+                    // changed col
+                    const diff = prettyPrintDiff(oldCol, newCol);
+                    if (diff.length > 0) {
+                        SqliteOrm.logInfo(this.opts, `${newCol.name} was changed: ${diff}`);
+                    }
                 }
 
-                if (newCols.length > 0) {
-                    SqliteOrm.logInfo(this.opts, `[${model.name}] found ${newCols.length} new column(s) (${newCols.map((c) => c.name).join(', ')})`);
+                // new col
+                for (const newCol of newCols.filter((c) => oldCols.find((o) => (o.mappedTo ?? o.name) === (c.mappedTo ?? c.name)) == null)) {
+                    SqliteOrm.logInfo(this.opts, `${newCol.name} was added`);
                 }
-
-                // todo: log column data type differences
 
                 this.saveModel();
             }
