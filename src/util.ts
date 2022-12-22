@@ -10,7 +10,7 @@ export function getObjDifferences(oldObj: Record<string, any>, newObj: Record<st
         }
 
         // property was changed
-        if (oldObj[k] !== newObj[k]) {
+        if (JSON.stringify(oldObj[k]) !== JSON.stringify(newObj[k])) {
             diff[k] = {
                 old: v,
                 new: newObj[k],

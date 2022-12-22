@@ -453,7 +453,7 @@ export class SqliteOrm {
                     }
 
                     // changed col
-                    const diff = prettyPrintDiff(oldCol, newCol);
+                    const diff = prettyPrintDiff({ ...oldCol, defaultValue: undefined }, { ...newCol, defaultValue: undefined });
                     if (diff.length > 0) {
                         this.hasModelChanges = true;
                         SqliteOrm.logInfo(this.opts, `[${model.name}] column ${newCol.name} was changed: ${diff}`);
