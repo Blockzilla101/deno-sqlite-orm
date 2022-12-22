@@ -6,12 +6,38 @@ import { prettyPrintDiff } from './util.ts';
 import { basename, join } from 'https://deno.land/std@0.170.0/path/mod.ts';
 
 interface OrmOptions {
+    /**
+     * Path to database file.
+     */
     dbPath: string;
+    /**
+     * sqlite3 open opts.
+     */
     openOptions?: DatabaseOpenOptions;
+    /**
+     * When set, backups are enabled.
+     */
     backupDir?: string;
-    backupInterval?: number; // set to null to use a custom logic
+    /**
+     * Delay between each time a backup is attempted.
+     * Leave unset if you want to use custom logic (call `orm.doBackup('auto')`)
+     */
+    backupInterval?: number;
+    /**
+     * When set, each backup is placed under `<backup-dir>/current-git-branch/`.
+     * Backups are also written with current git commit.
+     */
     backupUseGitCommit?: boolean;
-    backupMax?: number; // default 10
+    /**
+     * Maximum number of auto backups (default 10)
+     */
+    backupMax?: number;
+    /**
+     * Set to true if you are using an existing database that contains JSON.
+     * The library uses a custom parser to write maps and other class instances
+     * so that it can read them as the class instance. (Custom classes should be
+     * registered with `@registerJsonSerializabe()`)
+     */
     jsonCompatMode?: boolean;
 }
 
@@ -23,12 +49,34 @@ export class SqlTable {
 }
 
 export interface TableColumn {
+    /**
+     * Type of column
+     */
     type: ColumnType;
+    /**
+     * Name of column, preferrably same as one in the sqlite database.
+     */
     name: string;
+    /**
+     * Incase the column has a different name in the sqlite database.
+     */
     mappedTo?: string;
+    /**
+     * Whether this column can be set to null.
+     */
     nullable: boolean;
+    /**
+     * The default value of this column.
+     */
     defaultValue: any;
+    /**
+     * Whether this column is a primary key.
+     */
     isPrimaryKey: boolean;
+    /**
+     * Whether this column is automatically incremented.
+     * Only valid for type 'integer' columns.
+     */
     autoIncrement: boolean;
 }
 
