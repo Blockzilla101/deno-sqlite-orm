@@ -128,6 +128,12 @@ export class SqliteOrm {
             }
         }
 
+        if (this.opts.backupInterval && this.backupsEnabled) {
+            setInterval(() => {
+                this.doBackup('auto');
+            }, this.opts.backupInterval);
+        }
+
         SqliteOrm.logInfo(this.opts, 'opening database');
 
         this.db = new SqliteDatabase(options.dbPath, options.openOptions);
