@@ -1,3 +1,5 @@
+import { decode, encode } from 'https://deno.land/std@0.170.0/encoding/base64.ts';
+
 const serializableClasses: {
     classRef: new () => any;
     ignoredProps: string[];
@@ -39,7 +41,7 @@ function writeValue(val: any) {
 
             if (val instanceof Uint8Array) {
                 return {
-                    data: 'base64', // fixme
+                    data: encode(val),
                     type: 'U8IntArray',
                 };
             }
@@ -77,17 +79,16 @@ function readValue(val: any, compatMode: boolean) {
             }
 
             if (val.type == null) {
-                if (compatMode) return dejsonify(val, compatMode)
+                if (compatMode) return dejsonify(val, compatMode);
                 throw new Error('JSON object has a null type');
             }
-
 
             if (val.type === 'Map') {
                 return new Map(dejsonify(val.data, compatMode));
             }
 
             if (val.type === 'U8IntArray') {
-                return new Uint8Array(); // fixme parse base64
+                return decode(val.data);
             }
 
             if (val.type === 'object') {
