@@ -3,12 +3,15 @@ import { buildAggregateQuery, buildAlterQuery, buildCountWhereQuery, buildDelete
 import { DBInvalidData, DBInvalidTable, DBNotFound } from './errors.ts';
 import { dejsonify, jsonify } from './json.ts';
 import { prettyPrintDiff } from './util.ts';
+import { basename, join } from 'https://deno.land/std@0.170.0/path/mod.ts';
 
 interface OrmOptions {
     dbPath: string;
     openOptions?: DatabaseOpenOptions;
     backupDir?: string;
-    backupInterval?: number;
+    backupInterval?: number; // set to null to use a custom logic
+    backupUseGitCommit?: boolean;
+    backupMax?: number; // default 10
     jsonCompatMode?: boolean;
 }
 
@@ -79,31 +82,59 @@ export class Model {
     constructor(public tableName: string, public columns: TableColumn[]) {}
 }
 
+const gitBranch = new TextDecoder().decode(
+    await Deno.run({
+        cmd: ['git', 'branch', '--show-current'],
+        stdout: 'piped',
+    }).output(),
+).trim();
+
+const gitCommit = new TextDecoder().decode(
+    await Deno.run({
+        cmd: ['git', 'rev-parse', 'HEAD'],
+        stdout: 'piped',
+    }).output(),
+).trim();
+
 export class SqliteOrm {
     public db: SqliteDatabase;
     private hasChangesSinceBackup = false;
     private backupsEnabled = false;
+    private hasModelChanges = false;
 
     public models: Record<string, Model> = {};
     private tempModelData: TableColumn[] = [];
     private ignoredColumns: string[] = [];
 
     private opts: OrmOptions;
-    private lastModel: Record<string, Model> = {};
+    private lastModels: Record<string, Model> = {};
 
     constructor(options: OrmOptions) {
         this.opts = options;
         if (this.opts.backupDir) {
-            Deno.statSync(this.opts.backupDir);
+            this.backupsEnabled = true;
+            try {
+                Deno.statSync(this.opts.backupDir);
+            } catch (_e) {
+                Deno.mkdirSync(this.opts.backupDir);
+            }
+        }
+
+        if (this.opts.backupUseGitCommit && this.backupsEnabled) {
+            try {
+                Deno.statSync(join(this.opts.backupDir!, gitBranch));
+            } catch (_e) {
+                Deno.mkdirSync(join(this.opts.backupDir!, gitBranch));
+            }
         }
 
         SqliteOrm.logInfo(this.opts, 'opening database');
 
         this.db = new SqliteDatabase(options.dbPath, options.openOptions);
         try {
-            this.lastModel = JSON.parse(Deno.readTextFileSync(`${options.dbPath}.model.json`));
+            this.lastModels = JSON.parse(Deno.readTextFileSync(`${options.dbPath}.model.json`));
         } catch (_e) {
-            this.lastModel = {};
+            this.lastModels = {};
         }
     }
 
@@ -340,46 +371,51 @@ export class SqliteOrm {
             // create table if it doesnt exist
             const info = this.db.prepare(`PRAGMA table_info('${model.name}')`).all();
             if (info.length === 0) {
+                this.hasModelChanges = true;
                 this.db.exec(buildTableQuery(builtModel));
             } else {
                 // add missing columns
                 const info = this.db.prepare(`PRAGMA table_info('${model.name}')`).all();
                 buildAlterQuery(buildModelFromData(builtModel, info), builtModel).forEach((c) => {
+                    this.hasModelChanges = true;
                     this.db.exec(c);
                 });
             }
 
-            if (this.lastModel[model.name] == null) {
+            if (this.lastModels[model.name] == null) { // new a model was added
+                this.hasModelChanges = true;
                 SqliteOrm.logInfo(this.opts, `found new table ${model.name}`);
-                this.saveModel();
             } else {
-                const oldCols = this.lastModel[model.name].columns;
+                const oldCols = this.lastModels[model.name].columns;
                 const newCols = builtModel.columns;
 
                 for (const oldCol of oldCols) {
                     const newCol = newCols.find((c) => (c.mappedTo ?? c.name) === (oldCol.mappedTo ?? oldCol.name));
                     // missing col
                     if (newCol == null) {
-                        SqliteOrm.logInfo(this.opts, `${oldCol.name} was removed`);
+                        SqliteOrm.logInfo(this.opts, `[${model.name}] column ${oldCol.name} was removed`);
+                        this.hasModelChanges = true;
                         continue;
                     }
 
                     // changed col
                     const diff = prettyPrintDiff(oldCol, newCol);
                     if (diff.length > 0) {
-                        SqliteOrm.logInfo(this.opts, `${newCol.name} was changed: ${diff}`);
+                        this.hasModelChanges = true;
+                        SqliteOrm.logInfo(this.opts, `[${model.name}] column ${newCol.name} was changed: ${diff}`);
                     }
                 }
 
                 // new col
                 for (const newCol of newCols.filter((c) => oldCols.find((o) => (o.mappedTo ?? o.name) === (c.mappedTo ?? c.name)) == null)) {
-                    SqliteOrm.logInfo(this.opts, `${newCol.name} was added`);
+                    SqliteOrm.logInfo(this.opts, `[${model.name}] column ${newCol.name} was added`);
+                    this.hasModelChanges = true;
                 }
-
-                this.saveModel();
             }
         };
     }
+
+    //#endregion decorators
 
     //#region logging
 
@@ -391,7 +427,80 @@ export class SqliteOrm {
 
     //#endregion logging
 
-    //#endregion decorators
+    //#region backup
+
+    public manualBackup() {
+        this.doBackup('manual');
+    }
+
+    public doBackup(type: 'auto' | 'model-changes' | 'manual') {
+        if (!this.backupsEnabled) return;
+        if (!this.hasChangesSinceBackup && type === 'auto') return;
+        const filePath = join(this.backupDir(), this.backupName(type));
+        Deno.copyFileSync(this.db.path, filePath);
+
+        let backupCount = 0;
+        let oldestBackup = '';
+        let oldestTime = new Date();
+        for (const backup of Deno.readDirSync(this.backupDir())) {
+            if (!backup.isFile) continue;
+            if (backup.name.startsWith('auto-')) {
+                const [, createDate] = backup.name.split('-');
+                const date = new Date(createDate);
+                if (date < oldestTime) {
+                    oldestTime = date;
+                    oldestBackup = backup.name;
+                }
+
+                backupCount++;
+            }
+        }
+
+        if (backupCount > (this.opts.backupMax ?? 10)) {
+            Deno.removeSync(join(this.backupDir(), oldestBackup));
+        }
+
+        SqliteOrm.logInfo(this.opts, `Created a backup to <backup-dir>${this.opts.backupUseGitCommit ? `/${gitBranch}` : ''}/${this.backupName(type)}`);
+
+        this.hasChangesSinceBackup = false;
+    }
+
+    private backupDir() {
+        if (!this.opts.backupUseGitCommit) return this.opts.backupDir!;
+        return join(this.opts.backupDir!, gitBranch);
+    }
+
+    private backupName(type: 'auto' | 'model-changes' | 'manual') {
+        const dbName = basename(this.opts.dbPath);
+        if (this.opts.backupUseGitCommit) {
+            return `${type}-${(new Date()).toISOString()}-${gitCommit}-${dbName}`;
+        }
+        return `${type}-${(new Date()).toISOString()}-${dbName}`;
+    }
+
+    //#endregion backup
+
+    //#region misc
+
+    /**
+     * Should be called when all models are loaded. If backups are enabled a
+     * backup is created if tables were been modified.
+     */
+    public modelsLoaded() {
+        for (const m of Object.keys(this.lastModels).filter((k) => this.models[k] == null)) {
+            SqliteOrm.logInfo(this.opts, `${m} was removed`);
+            this.hasModelChanges = true;
+        }
+
+        if (this.hasModelChanges) {
+            this.saveModel();
+            this.doBackup('model-changes');
+        }
+
+        this.hasModelChanges = false;
+    }
+
+    //#endregion misc
 
     private createTempColumn(data: Partial<TableColumn>, model: SqlTable & Record<string, any>, propertyKey: string) {
         const index = this.tempModelData.findIndex((i) => i.name == propertyKey);
@@ -443,7 +552,7 @@ export class SqliteOrm {
                 return data;
             }
             case 'integer': {
-                if (typeof data !== 'number' || Number.isInteger(data)) throw new DBInvalidData('Cannot store a non integer type on an integer column');
+                if (typeof data !== 'number' || !Number.isInteger(data)) throw new DBInvalidData('Cannot store a non integer type on an integer column');
                 return data;
             }
             case 'blob': {
