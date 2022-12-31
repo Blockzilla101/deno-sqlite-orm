@@ -250,6 +250,7 @@ export class SqliteOrm {
             for (const col of this.models[table.name].columns) {
                 (parsed as Record<string, unknown>)[col.name] = this.deseralize(datum[col.mappedTo ?? col.name], col.type);
             }
+            parsed._new = false;
             parsedAll.push(parsed);
         }
 
@@ -266,31 +267,31 @@ export class SqliteOrm {
         return this.db.prepare(builtQuery.query).values(...builtQuery.params);
     }
 
-    public save<T extends SqlTable>(table: T): T {
-        const model = this.models[table.constructor.name];
+    public save<T extends SqlTable>(obj: T): T {
+        const model = this.models[obj.constructor.name];
 
         const builtData: Record<string, unknown> = {};
         model.columns.forEach((col) => {
-            builtData[col.mappedTo ?? col.name] = this.serialize((table as Record<string, unknown>)[col.name], col.type);
+            builtData[col.mappedTo ?? col.name] = this.serialize((obj as Record<string, unknown>)[col.name], col.type);
         });
 
-        if (table._new) {
+        if (obj._new) {
             const builtQuery = buildInsertQuery(model, builtData);
             this.db.exec(builtQuery.query, ...builtQuery.params);
 
             const incrementPrimaryKey = model.columns.find((c) => c.isPrimaryKey && c.autoIncrement);
             if (incrementPrimaryKey) {
-                (table as Record<string, unknown>)[incrementPrimaryKey.name] = this.db.lastInsertRowId;
+                (obj as Record<string, unknown>)[incrementPrimaryKey.name] = this.db.lastInsertRowId;
             }
 
-            table._new = false;
+            obj._new = false;
         } else {
             const builtQuery = buildUpdateQuery(model, builtData);
             this.db.exec(builtQuery.query, ...builtQuery.params);
         }
         this.hasChangesSinceBackup = true;
 
-        return table;
+        return obj;
     }
 
     public delete<T extends SqlTable>(table: new () => T, query: DeleteQuery) {
