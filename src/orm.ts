@@ -1,6 +1,6 @@
 import { Database as SqliteDatabase, DatabaseOpenOptions } from 'https://deno.land/x/sqlite3@0.6.1/mod.ts';
 import { buildAggregateQuery, buildAlterQuery, buildCountWhereQuery, buildDeleteQuery, buildInsertQuery, buildModelFromData, buildSelectQuery, buildTableQuery, buildUpdateQuery, isProvidedTypeValid } from './builder.ts';
-import { DBInvalidData, DBInvalidTable, DBNotFound } from './errors.ts';
+import { DBInvalidData, DBInvalidTable, DBModelNotFound, DBNotFound } from './errors.ts';
 import { dejsonify, jsonify } from './json.ts';
 import { prettyPrintDiff } from './util.ts';
 import { basename, join } from 'https://deno.land/std@0.170.0/path/mod.ts';
@@ -195,6 +195,8 @@ export class SqliteOrm {
     //#region table logic
 
     public findOne<T extends SqlTable>(table: new () => T, idOrQuery: PrimitiveTypes | SelectQuery): T {
+        if (this.models[table.name] == null) throw new DBModelNotFound(table);
+
         const col = this.models[table.name].columns.find((c) => c.isPrimaryKey);
         if (col == null) throw new DBInvalidTable(`${this.models[table.name].tableName} does not have primary key`);
         if (typeof idOrQuery !== 'object' && !isProvidedTypeValid(idOrQuery, col)) throw new DBInvalidData(`${this.models[table.name].tableName}.${col.name} has a different type`);
@@ -240,6 +242,8 @@ export class SqliteOrm {
     }
 
     public findMany<T extends SqlTable>(table: new () => T, query: SelectQuery): T[] {
+        if (this.models[table.name] == null) throw new DBModelNotFound(table);
+
         const builtQuery = buildSelectQuery(query, this.models[table.name].tableName);
 
         const data = this.db.prepare(builtQuery.query).all(...builtQuery.params);
@@ -258,17 +262,22 @@ export class SqliteOrm {
     }
 
     public countWhere<T extends SqlTable>(table: new () => T, query: WhereClause): number {
+        if (this.models[table.name] == null) throw new DBModelNotFound(table);
+
         const builtQuery = buildCountWhereQuery(query, this.models[table.name].tableName);
         return this.db.prepare(builtQuery.query).get<{ 'COUNT(*)': number }>(...builtQuery.params)!['COUNT(*)'];
     }
 
     public aggregateSelect<Row extends Array<any>, T extends SqlTable = SqlTable>(table: new () => T, query: AggregateSelectQuery): Row[] {
+        if (this.models[table.name] == null) throw new DBModelNotFound(table);
+
         const builtQuery = buildAggregateQuery(query, this.models[table.name].tableName);
         return this.db.prepare(builtQuery.query).values(...builtQuery.params);
     }
 
     public save<T extends SqlTable>(obj: T): T {
         const model = this.models[obj.constructor.name];
+        if (model == null) throw new DBModelNotFound(obj.constructor as typeof SqlTable);
 
         const builtData: Record<string, unknown> = {};
         model.columns.forEach((col) => {
