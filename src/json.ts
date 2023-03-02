@@ -1,4 +1,4 @@
-import { decode, encode } from 'https://deno.land/std@0.176.0/encoding/base64.ts';
+import { decode, encode } from 'https://deno.land/std@0.178.0/encoding/base64.ts';
 
 const serializableClasses: {
     classRef: new () => any;

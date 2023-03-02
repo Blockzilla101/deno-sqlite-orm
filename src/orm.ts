@@ -1,9 +1,9 @@
-import { Database as SqliteDatabase, DatabaseOpenOptions } from 'https://deno.land/x/sqlite3@0.7.3/mod.ts';
+import { Database as SqliteDatabase, DatabaseOpenOptions } from 'https://deno.land/x/sqlite3@0.8.1/mod.ts';
 import { buildAggregateQuery, buildAlterQuery, buildCountWhereQuery, buildDeleteQuery, buildInsertQuery, buildModelFromData, buildSelectQuery, buildTableQuery, buildUpdateQuery, isProvidedTypeValid } from './builder.ts';
 import { DBInvalidData, DBInvalidTable, DBModelNotFound, DBNotFound } from './errors.ts';
 import { dejsonify, jsonify } from './json.ts';
 import { prettyPrintDiff } from './util.ts';
-import { basename, join } from 'https://deno.land/std@0.176.0/path/mod.ts';
+import { basename, join } from 'https://deno.land/std@0.178.0/path/mod.ts';
 
 interface OrmOptions {
     /**
