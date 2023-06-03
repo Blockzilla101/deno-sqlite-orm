@@ -547,6 +547,13 @@ export class SqliteOrm {
     //#region misc
 
     /**
+     * Cleanly close the database.
+     */
+    public close() {
+        this.db.close();
+    }
+
+    /**
      * Should be called when all models are loaded. If backups are enabled a
      * backup is created if tables were been modified.
      */
