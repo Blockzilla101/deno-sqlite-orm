@@ -22,7 +22,8 @@ require_clean_work_tree () {
 
     if git diff-index --quiet HEAD --
     then
-        echo >&2 "cannot $1: your index contains untracked files."
+        echo >&2 "warning: your index contains untracted files."
+        # echo >&2 "cannot $1: your index contains untracked files."
         # err=1
     fi
 
@@ -62,6 +63,7 @@ echo "Created a tag & a commit"
 
 echo "Release is ready for pushing (press any to push)"
 read -n 1 -s -r
-git push --all
+git push
+git push --tags
 
 echo "Done"
