@@ -1,11 +1,11 @@
-import { decode, encode } from 'https://deno.land/std@0.178.0/encoding/base64.ts';
+import { decode, encode } from 'https://deno.land/std@0.192.0/encoding/base64.ts';
 
 const serializableClasses: {
     classRef: new () => any;
     ignoredProps: string[];
 }[] = [];
 
-export function registerJsonSerializabe(ignoredProps: string[] = []) {
+export function registerJsonSerializable(ignoredProps: string[] = []) {
     return (clas: new () => any) => {
         serializableClasses.push({
             classRef: clas,
@@ -14,7 +14,7 @@ export function registerJsonSerializabe(ignoredProps: string[] = []) {
     };
 }
 
-function isSerializabe(obj: any): boolean {
+function isSerializable(obj: any): boolean {
     return typeof obj !== 'bigint' && typeof obj !== 'function' && typeof obj !== 'symbol';
 }
 
@@ -123,7 +123,7 @@ export function jsonify(obj: Record<string, any> | any[], ignoredProps: string[]
     if (obj instanceof Array) {
         const parsed: any[] = [];
         for (const item of obj) {
-            if (!isSerializabe(item)) continue;
+            if (!isSerializable(item)) continue;
             parsed.push(writeValue(item));
         }
         return parsed;
@@ -132,7 +132,7 @@ export function jsonify(obj: Record<string, any> | any[], ignoredProps: string[]
     // parse objects
     const parsed: Record<string, any> = {};
     for (const [key, value] of Object.entries(obj)) {
-        if (!isSerializabe(value)) continue;
+        if (!isSerializable(value)) continue;
         if (ignoredProps.includes(key)) continue;
         parsed[key] = writeValue(value);
     }

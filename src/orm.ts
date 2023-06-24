@@ -3,7 +3,7 @@ import { buildAggregateQuery, buildAlterQuery, buildCountWhereQuery, buildDelete
 import { DBInvalidData, DBInvalidTable, DBModelNotFound, DBNotFound } from './errors.ts';
 import { dejsonify, jsonify } from './json.ts';
 import { prettyPrintDiff } from './util.ts';
-import { basename, join } from 'https://deno.land/std@0.178.0/path/mod.ts';
+import { basename, join } from 'https://deno.land/std@0.192.0/path/mod.ts';
 
 interface OrmOptions {
     /**
@@ -36,7 +36,7 @@ interface OrmOptions {
      * Set to true if you are using an existing database that contains JSON.
      * The library uses a custom parser to write maps and other class instances
      * so that it can read them as the class instance. (Custom classes should be
-     * registered with `@registerJsonSerializabe()`)
+     * registered with `@registerJsonSerializable()`)
      */
     jsonCompatMode?: boolean;
 }
@@ -54,7 +54,7 @@ export interface TableColumn {
      */
     type: ColumnType;
     /**
-     * Name of column, preferrably same as one in the sqlite database.
+     * Name of column, preferably same as one in the sqlite database.
      */
     name: string;
     /**
@@ -131,17 +131,17 @@ export class Model {
 }
 
 const gitBranch = new TextDecoder().decode(
-    await Deno.run({
-        cmd: ['git', 'branch', '--show-current'],
+    new Deno.Command('git', {
+        args: ['branch', '--show-current'],
         stdout: 'piped',
-    }).output(),
+    }).outputSync().stdout,
 ).trim();
 
 const gitCommit = new TextDecoder().decode(
-    await Deno.run({
-        cmd: ['git', 'rev-parse', 'HEAD'],
+    new Deno.Command('git', {
+        args: ['rev-parse', 'HEAD'],
         stdout: 'piped',
-    }).output(),
+    }).outputSync().stdout,
 ).trim();
 
 export class SqliteOrm {
@@ -223,7 +223,7 @@ export class SqliteOrm {
 
         const parsed = new table();
         for (const col of this.models[table.name].columns) {
-            (parsed as Record<string, unknown>)[col.name] = this.deseralize(found[col.mappedTo ?? col.name], col.type);
+            (parsed as Record<string, unknown>)[col.name] = this.deserialize(found[col.mappedTo ?? col.name], col.type);
         }
         parsed._new = false;
 
@@ -252,7 +252,7 @@ export class SqliteOrm {
         for (const datum of data) {
             const parsed = new table();
             for (const col of this.models[table.name].columns) {
-                (parsed as Record<string, unknown>)[col.name] = this.deseralize(datum[col.mappedTo ?? col.name], col.type);
+                (parsed as Record<string, unknown>)[col.name] = this.deserialize(datum[col.mappedTo ?? col.name], col.type);
             }
             parsed._new = false;
             parsedAll.push(parsed);
@@ -314,7 +314,7 @@ export class SqliteOrm {
     //#region decorators
 
     /**
-     * Explicity set column type for a model otherwised inferred from default value.
+     * Explicity set column type for a model otherwise its inferred from default value.
      * @param type type of table column
      * @param nullable whether column can have a null value, defaults to true when property value is `undefined` or `null`
      */
@@ -432,7 +432,7 @@ export class SqliteOrm {
             this.models[model.name] = builtModel;
             this.tempModelData = [];
 
-            // create table if it doesnt exist
+            // create table if it doesn't exist
             const info = this.db.prepare(`PRAGMA table_info('${model.name}')`).all();
             if (info.length === 0) {
                 this.hasModelChanges = true;
@@ -640,7 +640,7 @@ export class SqliteOrm {
         }
     }
 
-    private deseralize(data: any, type: ColumnType) {
+    private deserialize(data: any, type: ColumnType) {
         if (data == null) return null;
         switch (type) {
             case 'boolean': {

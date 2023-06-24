@@ -1,21 +1,20 @@
-Sqlite ORM for deno. Tables with relations are not supporeted.
+Sqlite ORM for deno. Tables with relations are not supported.
 
 #### Usage
 **Create an instance of the ORM:**
 ```typescript
-import { SqliteOrm, SqlTable } from 'https://raw.githubusercontent.com/Blockzilla101/deno-sqlite-orm/0.5.2/mod.ts';
+import { SqliteOrm, SqlTable } from 'https://deno.land/x/deno_sqlite_orm@0.5.2/mod.ts';
 const orm = new SqliteOrm({
     dbPath: 'path/to/database.db'
 });
 ```
-You can access the database instance directly by `orm.db`. If you are using an existing database and it contains JSON objects, enable `jsonCompatMode` in options or objects similar to:
+You can access the database instance directly by `orm.db`. If you are using an existing database and it contains JSON objects, enable `jsonCompatMode` in options or objects similar to following will not be parsed.
 ```json
 {
     "foo": "baz",
     "bar": 0
 }
 ```
-will not be parsed.<br>
 
 **Create a model:**
 ```typescript
@@ -26,11 +25,10 @@ class Foo extends SqlTable {
 ```
 Incase `Foo` exists in the database but has a different name, use `@orm.model('bar')`. All Tables have `id` as a primary key. 
 It can be removed by overriding it and using `@orm.ignoreColumn()`. Tables are created if they don't exist. If new columns 
-are added, the table is altered. If a column is removed from the model, it still stays in the database. If you want to renamed
-a column use `@orm.mappedTo('oldName')`
+are added, the table is altered. If a column is removed from the model, it still stays in the database. If you want to rename the property, or the column exists with a different name use `@orm.mappedTo('oldName')`
 
 **Defining columns:**<br>
-All properties of the table are considered as columns. Column types are autmatically inferred from the default value<br>
+All properties of the table are considered as columns. Column types are automatically inferred from the default value<br>
 of the property.
 ```typescript
 class Foo extends SqlTable {
@@ -39,7 +37,7 @@ class Foo extends SqlTable {
   // type is automatically inferred as "string"
   public foo = 'bar'
 
-  // column type is required when property doesnt have a default value
+  // column type is required when property doesn't have a default value
   @orm.columnType('string')
   public bar!: string
 
@@ -65,7 +63,7 @@ class Foo extends SqlTable {
   @orm.mappedTo('bar')
   public baa = ''
 
-  // if you dont want to stack multiple decorators, you can do:
+  // if you don't want to stack multiple decorators, you can do:
   @orm.column({ type: 'string', nullable: true })
   public faz!: string | null
 }
@@ -86,7 +84,7 @@ orm.findOne(Foo, {
 // you can check if its new from `Foo._new`
 orm.findOneOptional(Foo, 1)
 
-// same as `findOne` but returns multiple instanceof/rows of Foo
+// same as `findOne` but returns multiple instances of or rows of Foo
 orm.findMany(Foo, {
   where: {
     clause: 'id > 5'
@@ -126,11 +124,12 @@ orm.aggregateSelect<[foo: string, count: number]>(Foo, {
 
 **Saving objects:**<br>
 Objects are converted to JSON before saving, and parsed when read. If its a class instance then the class should be registered
-by `@registerJsonSerializabe()`
+by `@registerJsonSerializable()`
 ```typescript
-import { registerJsonSerializabe } from 'https://raw.githubusercontent.com/Blockzilla101/deno-sqlite-orm/0.5.2/mod.ts';
+import { registerJsonSerializable } from 'https://deno.land/x/deno_sqlite_orm@0.5.2/mod.ts';
 
-@registerJsonSerializabe(['ignored'])
+// the property "ignored" will be ignored and not saved
+@registerJsonSerializable(['ignored'])
 class Bar {
   public foo = 'bar'
   public ignored = ''
@@ -138,7 +137,7 @@ class Bar {
 
 @orm.model()
 class Foo extends SqlTable {
-  // type is autmatically inferred as json
+  // type is automatically inferred as json
   bar: Record<string, any> = {}
   baz: Bar = new Bar()
 }
@@ -146,7 +145,7 @@ class Foo extends SqlTable {
 
 ##### Example
 ```typescript
-import { SqliteOrm, SqlTable } from 'https://raw.githubusercontent.com/Blockzilla101/deno-sqlite-orm/0.5.2/mod.ts';
+import { SqliteOrm, SqlTable } from 'https://deno.land/x/deno_sqlite_orm@0.5.2/mod.ts';
 const orm = new SqliteOrm({
     dbPath: 'path/to/database.db',
 });
