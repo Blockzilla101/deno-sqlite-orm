@@ -3,7 +3,7 @@ Sqlite ORM for deno. Tables with relations are not supported.
 #### Usage
 **Create an instance of the ORM:**
 ```typescript
-import { SqliteOrm, SqlTable } from 'https://deno.land/x/deno_sqlite_orm@1.1.0/mod.ts';
+import { SqliteOrm, SqlTable } from 'https://deno.land/x/deno_sqlite_orm@1.1.1/mod.ts';
 const orm = new SqliteOrm({
     dbPath: 'path/to/database.db'
 });
@@ -128,7 +128,7 @@ orm.aggregateSelect<[foo: string, count: number]>(Foo, {
 Objects are converted to JSON before saving, and parsed when read. If its a class instance then the class should be registered
 by `@registerJsonSerializable()`
 ```typescript
-import { registerJsonSerializable } from 'https://deno.land/x/deno_sqlite_orm@1.1.0/mod.ts';
+import { registerJsonSerializable } from 'https://deno.land/x/deno_sqlite_orm@1.1.1/mod.ts';
 
 // the property "ignored" will be ignored and not saved
 @registerJsonSerializable(['ignored'])
@@ -147,7 +147,7 @@ class Foo extends SqlTable {
 
 ##### Example
 ```typescript
-import { SqliteOrm, SqlTable } from 'https://deno.land/x/deno_sqlite_orm@1.1.0/mod.ts';
+import { SqliteOrm, SqlTable } from 'https://deno.land/x/deno_sqlite_orm@1.1.1/mod.ts';
 const orm = new SqliteOrm({
     dbPath: 'path/to/database.db',
 });
