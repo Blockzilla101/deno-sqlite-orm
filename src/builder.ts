@@ -42,7 +42,7 @@ function getDefaultValue(type: ColumnType, value: any) {
 }
 
 export function buildTableQuery(model: Model) {
-    const str = [`CREATE TABLE '${model.tableName}' (`];
+    const str = [`CREATE TABLE ${model.database}.'${model.tableName}' (`];
     for (const column of model.columns) {
         str.push(buildColumnQuery(column) + ',');
     }
@@ -64,7 +64,7 @@ export function buildAlterQuery(existingModel: Model, actualModel: Model) {
 
     return actualModel.columns
         .filter((col) => existingModel.columns.find((c) => c.name === col.name || c.name === col.mappedTo) == null)
-        .map((col) => `ALTER TABLE '${actualModel.tableName}' ADD COLUMN ${buildColumnQuery(col)}`);
+        .map((col) => `ALTER TABLE '${actualModel.database}.${actualModel.tableName}' ADD COLUMN ${buildColumnQuery(col)}`);
 }
 
 export function buildModelFromData(ogModel: Model, data: any[]): Model {
@@ -85,7 +85,7 @@ export function buildModelFromData(ogModel: Model, data: any[]): Model {
         });
     }
 
-    return new Model(ogModel.tableName, cols);
+    return new Model(ogModel.tableName, cols, ogModel.database);
 }
 
 function buildBaseFilterQuery(query: Partial<SelectQuery>): BuiltQuery {
@@ -113,15 +113,15 @@ function buildBaseFilterQuery(query: Partial<SelectQuery>): BuiltQuery {
     };
 }
 
-export function buildSelectQuery(query: SelectQuery, table: string): BuiltQuery {
+export function buildSelectQuery(query: SelectQuery, model: Model): BuiltQuery {
     const base = buildBaseFilterQuery(query);
-    base.query = `SELECT * FROM '${table}' ${base.query}`;
+    base.query = `SELECT * FROM '${model.database}.${model.tableName}' ${base.query}`;
     return base;
 }
 
-export function buildDeleteQuery(query: DeleteQuery, table: string): BuiltQuery {
+export function buildDeleteQuery(query: DeleteQuery, model: Model): BuiltQuery {
     const base = buildBaseFilterQuery(query);
-    base.query = `DELETE FROM '${table}' ${base.query}`;
+    base.query = `DELETE FROM '${model.database}.${model.tableName}' ${base.query}`;
     return base;
 }
 
@@ -167,16 +167,16 @@ export function buildUpdateQuery(model: Model, data: Record<string, unknown>): B
     };
 }
 
-export function buildCountWhereQuery(query: WhereClause, table: string): BuiltQuery {
+export function buildCountWhereQuery(query: WhereClause, model: Model): BuiltQuery {
     return {
-        query: `SELECT COUNT(*) FROM '${table}' WHERE ${query.where.clause}`,
+        query: `SELECT COUNT(*) FROM '${model.database}.${model.tableName}' WHERE ${query.where.clause}`,
         params: query.where.values ?? [],
     };
 }
 
-export function buildAggregateQuery(query: AggregateSelectQuery, table: string): BuiltQuery {
+export function buildAggregateQuery(query: AggregateSelectQuery, model: Model): BuiltQuery {
     const params: any[] = [];
-    const str = [`SELECT ${query.select.clause} FROM '${table}'`];
+    const str = [`SELECT ${query.select.clause} FROM '${model.database}.${model.tableName}'`];
 
     if (query.where) {
         str.push(`WHERE ${query.where.clause}`);

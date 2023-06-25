@@ -16,12 +16,14 @@ You can access the database instance directly by `orm.db`. If you are using an e
 }
 ```
 
-**Create a model:**
+**Create a model:**<br>
+Use the `@orm.model()` decorator for creating a new model. After all models are loaded, call `orm.modelsLoaded()`
 ```typescript
 @orm.model()
 class Foo extends SqlTable {
 
 }
+orm.modelsLoaded()
 ```
 Incase `Foo` exists in the database but has a different name, use `@orm.model('bar')`. All Tables have `id` as a primary key. 
 It can be removed by overriding it and using `@orm.ignoreColumn()`. Tables are created if they don't exist. If new columns 
@@ -171,6 +173,7 @@ class Foo extends SqlTable {
   public ignored = ''
 }
 
+orm.modelsLoaded()
 const obj = new Foo()
 
 // save the obj

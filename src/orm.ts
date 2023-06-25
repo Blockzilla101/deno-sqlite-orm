@@ -1,9 +1,10 @@
 import { Database as SqliteDatabase, DatabaseOpenOptions } from 'https://deno.land/x/sqlite3@0.8.1/mod.ts';
 import { buildAggregateQuery, buildAlterQuery, buildCountWhereQuery, buildDeleteQuery, buildInsertQuery, buildModelFromData, buildSelectQuery, buildTableQuery, buildUpdateQuery, isProvidedTypeValid } from './builder.ts';
-import { DBInvalidData, DBInvalidTable, DBModelNotFound, DBNotFound } from './errors.ts';
+import { DBError, DBInvalidData, DBInvalidTable, DBModelNotFound, DBNotFound } from './errors.ts';
 import { dejsonify, jsonify } from './json.ts';
 import { prettyPrintDiff } from './util.ts';
 import { basename, join } from 'https://deno.land/std@0.192.0/path/mod.ts';
+import * as ModelReader from './model-reader.ts';
 
 interface OrmOptions {
     /**
@@ -127,7 +128,7 @@ export type PrimitiveTypes = number | string | boolean;
 export type DeleteQuery = Partial<SelectQuery>;
 
 export class Model {
-    constructor(public tableName: string, public columns: TableColumn[]) {}
+    constructor(public tableName: string, public columns: TableColumn[], public readonly database: string) {}
 }
 
 const gitBranch = new TextDecoder().decode(
@@ -149,8 +150,10 @@ export class SqliteOrm {
     private hasChangesSinceBackup = false;
     private backupsEnabled = false;
     private hasModelChanges = false;
+    private attachedDatabases: string[] = [];
 
     public models: Record<string, Model> = {};
+
     private tempModelData: TableColumn[] = [];
     private ignoredColumns: string[] = [];
 
@@ -185,11 +188,7 @@ export class SqliteOrm {
         SqliteOrm.logInfo(this.opts, 'opening database');
 
         this.db = new SqliteDatabase(options.dbPath, options.openOptions);
-        try {
-            this.lastModels = JSON.parse(Deno.readTextFileSync(`${options.dbPath}.model.json`));
-        } catch (_e) {
-            this.lastModels = {};
-        }
+        this.lastModels = ModelReader.read(options.dbPath);
     }
 
     //#region table logic
@@ -209,7 +208,7 @@ export class SqliteOrm {
                 },
                 limit: 1,
             },
-            this.models[table.name].tableName,
+            this.models[table.name],
         );
 
         const found = this.db.prepare(query.query).get(...query.params);
@@ -244,7 +243,7 @@ export class SqliteOrm {
     public findMany<T extends SqlTable>(table: new () => T, query: SelectQuery): T[] {
         if (this.models[table.name] == null) throw new DBModelNotFound(table);
 
-        const builtQuery = buildSelectQuery(query, this.models[table.name].tableName);
+        const builtQuery = buildSelectQuery(query, this.models[table.name]);
 
         const data = this.db.prepare(builtQuery.query).all(...builtQuery.params);
         const parsedAll: T[] = [];
@@ -264,14 +263,14 @@ export class SqliteOrm {
     public countWhere<T extends SqlTable>(table: new () => T, query: WhereClause): number {
         if (this.models[table.name] == null) throw new DBModelNotFound(table);
 
-        const builtQuery = buildCountWhereQuery(query, this.models[table.name].tableName);
+        const builtQuery = buildCountWhereQuery(query, this.models[table.name]);
         return this.db.prepare(builtQuery.query).get<{ 'COUNT(*)': number }>(...builtQuery.params)!['COUNT(*)'];
     }
 
     public aggregateSelect<Row extends Array<any>, T extends SqlTable = SqlTable>(table: new () => T, query: AggregateSelectQuery): Row[] {
         if (this.models[table.name] == null) throw new DBModelNotFound(table);
 
-        const builtQuery = buildAggregateQuery(query, this.models[table.name].tableName);
+        const builtQuery = buildAggregateQuery(query, this.models[table.name]);
         return this.db.prepare(builtQuery.query).values(...builtQuery.params);
     }
 
@@ -304,7 +303,7 @@ export class SqliteOrm {
     }
 
     public delete<T extends SqlTable>(table: new () => T, query: DeleteQuery) {
-        const built = buildDeleteQuery(query, this.models[table.name].tableName);
+        const built = buildDeleteQuery(query, this.models[table.name]);
         this.db.exec(built.query, ...built.params);
         this.hasChangesSinceBackup = true;
     }
@@ -382,11 +381,12 @@ export class SqliteOrm {
         };
     }
 
+    // todo use an object
     /**
      * Adds a class to orm models.
      * @param tableName name of table in database
      */
-    public model(tableName?: string) {
+    public model(tableName?: string, database = 'main') {
         return (model: new () => SqlTable) => {
             const tempModel = new model();
             const hasPrimaryKey = this.tempModelData.find((i) => i.isPrimaryKey) != null;
@@ -428,18 +428,18 @@ export class SqliteOrm {
                 );
             }
 
-            const builtModel = new Model(tableName ?? model.name, this.tempModelData);
+            const builtModel = new Model(tableName ?? model.name, this.tempModelData, database);
             this.models[model.name] = builtModel;
             this.tempModelData = [];
 
             // create table if it doesn't exist
-            const info = this.db.prepare(`PRAGMA table_info('${model.name}')`).all();
+            const info = this.db.prepare(`PRAGMA ${database}.table_info('${model.name}')`).all();
             if (info.length === 0) {
                 this.hasModelChanges = true;
                 this.db.exec(buildTableQuery(builtModel));
             } else {
                 // add missing columns
-                const info = this.db.prepare(`PRAGMA table_info('${model.name}')`).all();
+                const info = this.db.prepare(`PRAGMA ${database}.table_info('${model.name}')`).all();
                 buildAlterQuery(buildModelFromData(builtModel, info), builtModel).forEach((c) => {
                     this.hasModelChanges = true;
                     this.db.exec(c);
@@ -452,6 +452,12 @@ export class SqliteOrm {
             } else {
                 const oldCols = this.lastModels[model.name].columns;
                 const newCols = builtModel.columns;
+                const oldDatabase = this.lastModels[model.name].database;
+
+                if (oldDatabase != null && oldDatabase !== database) {
+                    SqliteOrm.logInfo(this.opts, `database change from ${oldDatabase} to ${database}`);
+                    this.hasModelChanges = true;
+                }
 
                 for (const oldCol of oldCols) {
                     const newCol = newCols.find((c) => (c.mappedTo ?? c.name) === (oldCol.mappedTo ?? oldCol.name));
@@ -564,11 +570,23 @@ export class SqliteOrm {
         }
 
         if (this.hasModelChanges) {
-            this.saveModel();
             this.doBackup('model-changes');
         }
 
         this.hasModelChanges = false;
+        this.saveModel();
+    }
+
+    public attach(databasePath: string, name?: string) {
+        if (name == null) {
+            name = basename(databasePath);
+        }
+
+        if (this.attachedDatabases.includes(name)) throw new DBError(`${databasePath} is already attached`);
+        this.db.exec(`ATTACH DATABASE ? AS ?`, databasePath, name);
+        this.attachedDatabases.push(name);
+
+        SqliteOrm.logInfo(this.opts, `attached ${databasePath} as ${name}`);
     }
 
     //#endregion misc
@@ -676,6 +694,6 @@ export class SqliteOrm {
     }
 
     private saveModel() {
-        Deno.writeTextFileSync(`${this.opts.dbPath}.model.json`, JSON.stringify(this.models, null, 2));
+        ModelReader.write(this.models, this.opts.dbPath);
     }
 }
