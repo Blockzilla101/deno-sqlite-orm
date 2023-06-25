@@ -64,7 +64,7 @@ export function buildAlterQuery(existingModel: Model, actualModel: Model) {
 
     return actualModel.columns
         .filter((col) => existingModel.columns.find((c) => c.name === col.name || c.name === col.mappedTo) == null)
-        .map((col) => `ALTER TABLE '${actualModel.database}.${actualModel.tableName}' ADD COLUMN ${buildColumnQuery(col)}`);
+        .map((col) => `ALTER TABLE ${actualModel.database}.'${actualModel.tableName}' ADD COLUMN ${buildColumnQuery(col)}`);
 }
 
 export function buildModelFromData(ogModel: Model, data: any[]): Model {
@@ -115,13 +115,13 @@ function buildBaseFilterQuery(query: Partial<SelectQuery>): BuiltQuery {
 
 export function buildSelectQuery(query: SelectQuery, model: Model): BuiltQuery {
     const base = buildBaseFilterQuery(query);
-    base.query = `SELECT * FROM '${model.database}.${model.tableName}' ${base.query}`;
+    base.query = `SELECT * FROM ${model.database}.'${model.tableName}' ${base.query}`;
     return base;
 }
 
 export function buildDeleteQuery(query: DeleteQuery, model: Model): BuiltQuery {
     const base = buildBaseFilterQuery(query);
-    base.query = `DELETE FROM '${model.database}.${model.tableName}' ${base.query}`;
+    base.query = `DELETE FROM ${model.database}.'${model.tableName}' ${base.query}`;
     return base;
 }
 
@@ -169,14 +169,14 @@ export function buildUpdateQuery(model: Model, data: Record<string, unknown>): B
 
 export function buildCountWhereQuery(query: WhereClause, model: Model): BuiltQuery {
     return {
-        query: `SELECT COUNT(*) FROM '${model.database}.${model.tableName}' WHERE ${query.where.clause}`,
+        query: `SELECT COUNT(*) FROM ${model.database}.'${model.tableName}' WHERE ${query.where.clause}`,
         params: query.where.values ?? [],
     };
 }
 
 export function buildAggregateQuery(query: AggregateSelectQuery, model: Model): BuiltQuery {
     const params: any[] = [];
-    const str = [`SELECT ${query.select.clause} FROM '${model.database}.${model.tableName}'`];
+    const str = [`SELECT ${query.select.clause} FROM ${model.database}.'${model.tableName}'`];
 
     if (query.where) {
         str.push(`WHERE ${query.where.clause}`);
