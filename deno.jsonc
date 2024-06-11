@@ -1,31 +1,25 @@
 {
-  "lint": {
-    "rules": {
-      "tags": [
-        "recommended"
-      ],
-      "exclude": [
-        "no-explicit-any"
-      ]
+    "lint": {
+        "rules": {
+            "tags": ["recommended"],
+            "exclude": ["no-explicit-any"]
+        },
+        "files": {
+            "include": ["src/", "config.json"]
+        }
     },
-    "files": {
-      "include": [
-        "src/",
-        "config.json"
-      ]
-    }
-  },
-  "fmt": {
-    "files": {
-      "include": [
-        "src/"
-      ]
+    "fmt": {
+        "files": {
+            "include": ["src/"]
+        },
+        "options": {
+            "useTabs": false,
+            "indentWidth": 4,
+            "singleQuote": true,
+            "lineWidth": 1000
+        }
     },
-    "options": {
-      "useTabs": false,
-      "indentWidth": 4,
-      "singleQuote": true,
-      "lineWidth": 1000
+    "compilerOptions": {
+        "experimentalDecorators": true
     }
-  }
 }
