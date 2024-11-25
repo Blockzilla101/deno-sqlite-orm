@@ -1,4 +1,4 @@
-import { decode, encode } from 'https://deno.land/std@0.192.0/encoding/base64.ts';
+import { decodeBase64, encodeBase64 } from 'jsr:@std/encoding@1.0.5';
 
 const serializableClasses: {
     classRef: new () => any;
@@ -41,7 +41,7 @@ function writeValue(val: any) {
 
             if (val instanceof Uint8Array) {
                 return {
-                    data: encode(val),
+                    data: encodeBase64(val),
                     type: 'U8IntArray',
                 };
             }
@@ -88,7 +88,7 @@ function readValue(val: any, compatMode: boolean) {
             }
 
             if (val.type === 'U8IntArray') {
-                return decode(val.data);
+                return decodeBase64(val.data);
             }
 
             if (val.type === 'object') {

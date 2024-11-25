@@ -1,4 +1,4 @@
-import { Database as SqliteDatabase, DatabaseOpenOptions } from 'https://deno.land/x/sqlite3@0.8.1/mod.ts';
+import { Database as SqliteDatabase, DatabaseOpenOptions } from 'jsr:@db/sqlite@0.11';
 import { buildAggregateQuery, buildAlterQuery, buildCountWhereQuery, buildDeleteQuery, buildInsertQuery, buildModelFromData, buildSelectQuery, buildTableQuery, buildUpdateQuery, isProvidedTypeValid } from './builder.ts';
 import { DBError, DBInvalidData, DBInvalidTable, DBModelNotFound, DBNotFound } from './errors.ts';
 import { dejsonify, jsonify } from './json.ts';
